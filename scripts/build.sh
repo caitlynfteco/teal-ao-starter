@@ -15,9 +15,8 @@ cyan build -u
 
 cd build-lua
 
-amalg.lua -s token/main.lua -o ../build/token.lua \
-    token.utils.bint token.utils.tl-utils \
-    dummy.dummy
+amalg.lua -s verification/main.lua -o ../build/verification.lua \
+    verification.utils.bint verification.utils.tl-utils 
 
 
 # FINAL RESULT is build/main.lua

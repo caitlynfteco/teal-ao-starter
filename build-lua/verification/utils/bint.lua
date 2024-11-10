@@ -1,22 +1,4 @@
-do
-local _ENV = _ENV
-package.preload[ "dummy.dummy" ] = function( ... ) local arg = _G.arg;
-function print_dummy(n)
-    print("dummy print:", n)
-end
-
-return {
-    print_dummy = print_dummy
-}
-end
-end
-
-do
-local _ENV = _ENV
-package.preload[ "token.utils.bint" ] = function( ... ) local arg = _G.arg;
 local _tl_compat; if (tonumber((_VERSION or ''):match('[%d.]*$')) or 0) < 5.3 then local p, m = pcall(require, 'compat53.module'); if p then _tl_compat = m end end; local assert = _tl_compat and _tl_compat.assert or assert; local debug = _tl_compat and _tl_compat.debug or debug; local math = _tl_compat and _tl_compat.math or math; local _tl_math_maxinteger = math.maxinteger or math.pow(2, 53); local _tl_math_mininteger = math.mininteger or -math.pow(2, 53) - 1; local string = _tl_compat and _tl_compat.string or string; local table = _tl_compat and _tl_compat.table or table; local _tl_table_unpack = unpack or table.unpack; BigInteger = {}
-
-
 
 
 
@@ -311,6 +293,11 @@ local function newmodule(bits, wordbits)
    local BINT_MININTEGER
 
 
+   local function has_bint_metatable(x)
+      return type(x) == "table" and (getmetatable(x)) == getmetatable(bint)
+   end
+
+
    function bint.zero()
       local x = setmetatable({}, bint)
       for i = 1, BINT_SIZE do
@@ -433,8 +420,27 @@ local function newmodule(bits, wordbits)
 
 
 
+
+
    function bint.isbint(x)
-      return getmetatable(x) == bint
+
+
+
+
+      local isTable = type(x) == 'table'
+      local mt = getmetatable(x)
+
+      local isBintish = mt and mt.isbint and
+      mt.tobint and
+      mt.zero and
+      mt.iszero and
+      mt.frombase and
+      mt.tobase and
+      mt.isneg and
+      mt.ispos and
+      true
+
+      return isTable and isBintish
    end
 
 
@@ -565,9 +571,8 @@ local function newmodule(bits, wordbits)
 
 
 
-
    function bint.new(x)
-      if getmetatable(x) ~= bint then
+      if not has_bint_metatable(x) then
          local ty = type(x)
          if ty == 'number' then
             x = bint_frominteger(x)
@@ -591,9 +596,8 @@ local function newmodule(bits, wordbits)
 
 
 
-
    function bint.tobint(x, clone)
-      if getmetatable(x) == bint then
+      if has_bint_metatable(x) then
          if not clone then
             return bint_assert_convert(x)
          end
@@ -610,7 +614,7 @@ local function newmodule(bits, wordbits)
    local tobint = bint.tobint
 
    function bint.touinteger(x)
-      if getmetatable(x) == bint then
+      if has_bint_metatable(x) then
          local n = 0
          local xi = bint_assert_convert_clone(x)
          for i = 1, BINT_SIZE do
@@ -630,7 +634,7 @@ local function newmodule(bits, wordbits)
 
 
    function bint.tointeger(x)
-      if getmetatable(x) == bint then
+      if has_bint_metatable(x) then
          local xi = bint_assert_convert_clone(x)
          local n = 0
          for i = 1, BINT_SIZE do
@@ -837,13 +841,13 @@ local function newmodule(bits, wordbits)
 
 
    function bint.isintegral(x)
-      return getmetatable(x) == bint or math_type(x) == 'integer'
+      return has_bint_metatable(x) or math_type(x) == 'integer'
    end
 
 
 
    function bint.isnumeric(x)
-      return getmetatable(x) == bint or type(x) == 'number'
+      return has_bint_metatable(x) or type(x) == 'number'
    end
 
 
@@ -851,7 +855,7 @@ local function newmodule(bits, wordbits)
 
 
    function bint.type(x)
-      if getmetatable(x) == bint then
+      if has_bint_metatable(x) then
          return 'bint'
       end
       return math_type(x)
@@ -1387,7 +1391,7 @@ local function newmodule(bits, wordbits)
 
       local ix
       local iy
-      ix, iy = tobint(ax), tobint(ay)
+      ix, iy = tobint(ax, false), tobint(ay, false)
       local quot
       local rema
       if ix and iy then
@@ -1810,7 +1814,7 @@ local function newmodule(bits, wordbits)
 
 
    function bint:__tostring()
-      return self:tobase(10)
+      return self:tobase(10, false)
    end
 
 
@@ -1829,294 +1833,3 @@ local function newmodule(bits, wordbits)
 end
 
 return newmodule
-end
-end
-
-do
-local _ENV = _ENV
-package.preload[ "token.utils.tl-utils" ] = function( ... ) local arg = _G.arg;
-local _tl_compat; if (tonumber((_VERSION or ''):match('[%d.]*$')) or 0) < 5.3 then local p, m = pcall(require, 'compat53.module'); if p then _tl_compat = m end end; local ipairs = _tl_compat and _tl_compat.ipairs or ipairs; local pairs = _tl_compat and _tl_compat.pairs or pairs; local table = _tl_compat and _tl_compat.table or table
-
-
-
-
-
-local function find(predicate, arr)
-   for _, value in ipairs(arr) do
-      if predicate(value) then
-         return value
-      end
-   end
-   return nil
-end
-
-local function filter(predicate, arr)
-   local result = {}
-   for _, value in ipairs(arr) do
-      if predicate(value) then
-         table.insert(result, value)
-      end
-   end
-   return result
-end
-
-local function reduce(reducer, initialValue, arr)
-   local result = initialValue
-   for i, value in ipairs(arr) do
-      result = reducer(result, value, i, arr)
-   end
-   return result
-end
-
-
-local function map(mapper, arr)
-   local result = {}
-   for i, value in ipairs(arr) do
-      result[i] = mapper(value, i, arr)
-   end
-   return result
-end
-
-local function reverse(arr)
-   local result = {}
-   for i = #arr, 1, -1 do
-      table.insert(result, arr[i])
-   end
-   return result
-end
-
-local function compose(...)
-   local funcs = { ... }
-   return function(x)
-      for i = #funcs, 1, -1 do
-         x = funcs[i](x)
-      end
-      return x
-   end
-end
-
-local function keys(xs)
-   local ks = {}
-   for k, _ in pairs(xs) do
-      table.insert(ks, k)
-   end
-   return ks
-end
-
-local function values(xs)
-   local vs = {}
-   for _, v in pairs(xs) do
-      table.insert(vs, v)
-   end
-   return vs
-end
-
-local function includes(value, arr)
-   for _, v in ipairs(arr) do
-      if v == value then
-         return true
-      end
-   end
-   return false
-end
-
-return {
-   find = find,
-   filter = filter,
-   reduce = reduce,
-   map = map,
-   reverse = reverse,
-   compose = compose,
-   values = values,
-   keys = keys,
-   includes = includes,
-}
-end
-end
-
-local _tl_compat; if (tonumber((_VERSION or ''):match('[%d.]*$')) or 0) < 5.3 then local p, m = pcall(require, 'compat53.module'); if p then _tl_compat = m end end; local assert = _tl_compat and _tl_compat.assert or assert; local pairs = _tl_compat and _tl_compat.pairs or pairs; local string = _tl_compat and _tl_compat.string or string; local bint = require('token.utils.bint')(256)
-local rxJson = require('json')
-local dummy_package = require('dummy.dummy')
-dummy_package.print_dummy(1)
-
-
-Balance = {}
-Address = {}
-
-
-
-
-
-
-
-
-
-local utils = {
-   add = function(a, b)
-      return tostring(bint(a) + bint(b))
-   end,
-   subtract = function(a, b)
-      return tostring(bint(a) - bint(b))
-   end,
-   toBalanceValue = function(a)
-      return tostring(bint(a))
-   end,
-   toNumber = function(a)
-      return tonumber(a)
-   end,
-}
-
-
-Variant = "0.0.3"
-Denomination = Denomination or "12"
-Balances = Balances or { [ao.id] = utils.toBalanceValue(10000 * 10 ^ tonumber(Denomination)) }
-TotalSupply = TotalSupply or utils.toBalanceValue(10000 * 10 ^ tonumber(Denomination))
-Name = Name or 'Points Coin'
-Ticker = Ticker or 'PNTS'
-Logo = Logo or 'SBCCXwwecBlDqRLUjb8dYABExTJXLieawf7m2aBJ-KY'
-
-
-local function infoHandler(msg)
-   ao.send({
-      Target = msg.From,
-      Name = Name,
-      Ticker = Ticker,
-      Logo = Logo,
-      Denomination = Denomination,
-   })
-end
-
-local function balanceHandler(msg)
-   local bal = '0'
-
-   if (msg.Tags.Recipient) then
-      if (Balances[msg.Tags.Recipient]) then
-         bal = Balances[msg.Tags.Recipient]
-      end
-   elseif msg.Tags.Target and Balances[msg.Tags.Target] then
-      bal = Balances[msg.Tags.Target]
-   elseif Balances[msg.From] then
-      bal = Balances[msg.From]
-   end
-
-   ao.send({
-      Target = msg.From,
-      Balance = bal,
-      Ticker = Ticker,
-      Account = msg.Tags.Recipient or msg.From,
-      Data = bal,
-   })
-end
-
-local function balancesHandler(msg)
-   ao.send({ Target = msg.From, Data = rxJson.encode(Balances) })
-end
-
-local function transferHandler(msg)
-   assert(type(msg.Tags.Recipient) == 'string', 'Recipient is required!')
-   assert(type(msg.Tags.Quantity) == 'string', 'Quantity is required!')
-   assert(bint(msg.Tags.Quantity):ge(bint(0)), 'Quantity must be greater than 0')
-
-   if not Balances[msg.From] then Balances[msg.From] = "0" end
-   if not Balances[msg.Tags.Recipient] then Balances[msg.Tags.Recipient] = "0" end
-
-   if bint(msg.Tags.Quantity):lt(bint(Balances[msg.From])) then
-      Balances[msg.From] = utils.subtract(Balances[msg.From], msg.Tags.Quantity)
-      Balances[msg.Tags.Recipient] = utils.add(Balances[msg.Tags.Recipient], msg.Tags.Quantity)
-
-      if not msg.Tags.Cast then
-         local debitNotice = {
-            Target = msg.From,
-            Action = 'Debit-Notice',
-            Recipient = msg.Tags.Recipient,
-            Quantity = msg.Tags.Quantity,
-            Data = Colors.gray ..
-            "You transferred " ..
-            Colors.blue .. msg.Tags.Quantity .. Colors.gray .. " to " .. Colors.green .. msg.Tags.Recipient .. Colors.reset,
-         }
-         local creditNotice = {
-            Target = msg.Tags.Recipient,
-            Action = 'Credit-Notice',
-            Sender = msg.From,
-            Quantity = msg.Tags.Quantity,
-            Data = Colors.gray ..
-            "You received " ..
-            Colors.blue .. msg.Tags.Quantity .. Colors.gray .. " from " .. Colors.green .. msg.From .. Colors.reset,
-         }
-
-         for tagName, tagValue in pairs(msg.Tags) do
-            if string.sub(tagName, 1, 2) == "X-" then
-               debitNotice[tagName] = tagValue
-               creditNotice[tagName] = tagValue
-            end
-         end
-
-         ao.send(debitNotice)
-         ao.send(creditNotice)
-      end
-   else
-      ao.send({
-         Target = msg.From,
-         Action = 'Transfer-Error',
-         ['Message-Id'] = msg.Tags.Id,
-         Error = 'Insufficient Balance!',
-      })
-   end
-end
-
-local function mintHandler(msg)
-   assert(type(msg.Tags.Quantity) == 'string', 'Quantity is required!')
-   assert(bint(msg.Tags.Quantity):ge(bint(0)), 'Quantity must be greater than zero!')
-
-   if not Balances[ao.id] then Balances[ao.id] = "0" end
-
-   if msg.From == ao.id then
-      Balances[msg.From] = utils.add(Balances[msg.From], msg.Tags.Quantity)
-      TotalSupply = utils.add(TotalSupply, msg.Tags.Quantity)
-      ao.send({
-         Target = msg.From,
-         Data = Colors.gray .. "Successfully minted " .. Colors.blue .. msg.Tags.Quantity .. Colors.reset,
-      })
-   else
-      ao.send({
-         Target = msg.From,
-         Action = 'Mint-Error',
-         ['Message-Id'] = msg.Tags.Id,
-         Error = 'Only the Process Id can mint new ' .. Ticker .. ' tokens!',
-      })
-   end
-end
-
-
-local function totalSupplyHandler(msg)
-   assert(msg.From ~= ao.id, 'Cannot call Total-Supply from the same process!')
-
-   ao.send({
-      Target = msg.From,
-      Action = 'Total-Supply',
-      Data = TotalSupply,
-      Ticker = Ticker,
-   })
-end
-
-local function burnHandler(msg)
-   assert(type(msg.Tags.Quantity) == 'string', 'Quantity is required!')
-   assert(bint(msg.Tags.Quantity):lt(bint(Balances[msg.From])), 'Quantity must be less than or equal to the current balance!')
-
-   Balances[msg.From] = utils.subtract(Balances[msg.From], msg.Tags.Quantity)
-   TotalSupply = utils.subtract(TotalSupply, msg.Tags.Quantity)
-
-   ao.send({
-      Target = msg.From,
-      Data = Colors.gray .. "Successfully burned " .. Colors.blue .. msg.Tags.Quantity .. Colors.reset,
-   })
-end
-
-
-Handlers.add('info', Handlers.utils.hasMatchingTag('Action', 'Info'), infoHandler)
-Handlers.add('balance', Handlers.utils.hasMatchingTag('Action', 'Balance'), balanceHandler)
-Handlers.add('balances', Handlers.utils.hasMatchingTag('Action', 'Balances'), balancesHandler)
-Handlers.add('transfer', Handlers.utils.hasMatchingTag('Action', 'Transfer'), transferHandler)
-Handlers.add('mint', Handlers.utils.hasMatchingTag('Action', 'Mint'), mintHandler)
-Handlers.add('totalSupply', Handlers.utils.hasMatchingTag('Action', 'Total-Supply'), totalSupplyHandler)
-Handlers.add('burn', Handlers.utils.hasMatchingTag('Action', 'Burn'), burnHandler)

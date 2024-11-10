@@ -1,6 +1,7 @@
+do
+local _ENV = _ENV
+package.preload[ "verification.utils.bint" ] = function( ... ) local arg = _G.arg;
 local _tl_compat; if (tonumber((_VERSION or ''):match('[%d.]*$')) or 0) < 5.3 then local p, m = pcall(require, 'compat53.module'); if p then _tl_compat = m end end; local assert = _tl_compat and _tl_compat.assert or assert; local debug = _tl_compat and _tl_compat.debug or debug; local math = _tl_compat and _tl_compat.math or math; local _tl_math_maxinteger = math.maxinteger or math.pow(2, 53); local _tl_math_mininteger = math.mininteger or -math.pow(2, 53) - 1; local string = _tl_compat and _tl_compat.string or string; local table = _tl_compat and _tl_compat.table or table; local _tl_table_unpack = unpack or table.unpack; BigInteger = {}
-
-
 
 
 
@@ -295,6 +296,11 @@ local function newmodule(bits, wordbits)
    local BINT_MININTEGER
 
 
+   local function has_bint_metatable(x)
+      return type(x) == "table" and (getmetatable(x)) == getmetatable(bint)
+   end
+
+
    function bint.zero()
       local x = setmetatable({}, bint)
       for i = 1, BINT_SIZE do
@@ -417,8 +423,27 @@ local function newmodule(bits, wordbits)
 
 
 
+
+
    function bint.isbint(x)
-      return getmetatable(x) == bint
+
+
+
+
+      local isTable = type(x) == 'table'
+      local mt = getmetatable(x)
+
+      local isBintish = mt and mt.isbint and
+      mt.tobint and
+      mt.zero and
+      mt.iszero and
+      mt.frombase and
+      mt.tobase and
+      mt.isneg and
+      mt.ispos and
+      true
+
+      return isTable and isBintish
    end
 
 
@@ -549,9 +574,8 @@ local function newmodule(bits, wordbits)
 
 
 
-
    function bint.new(x)
-      if getmetatable(x) ~= bint then
+      if not has_bint_metatable(x) then
          local ty = type(x)
          if ty == 'number' then
             x = bint_frominteger(x)
@@ -575,9 +599,8 @@ local function newmodule(bits, wordbits)
 
 
 
-
    function bint.tobint(x, clone)
-      if getmetatable(x) == bint then
+      if has_bint_metatable(x) then
          if not clone then
             return bint_assert_convert(x)
          end
@@ -594,7 +617,7 @@ local function newmodule(bits, wordbits)
    local tobint = bint.tobint
 
    function bint.touinteger(x)
-      if getmetatable(x) == bint then
+      if has_bint_metatable(x) then
          local n = 0
          local xi = bint_assert_convert_clone(x)
          for i = 1, BINT_SIZE do
@@ -614,7 +637,7 @@ local function newmodule(bits, wordbits)
 
 
    function bint.tointeger(x)
-      if getmetatable(x) == bint then
+      if has_bint_metatable(x) then
          local xi = bint_assert_convert_clone(x)
          local n = 0
          for i = 1, BINT_SIZE do
@@ -821,13 +844,13 @@ local function newmodule(bits, wordbits)
 
 
    function bint.isintegral(x)
-      return getmetatable(x) == bint or math_type(x) == 'integer'
+      return has_bint_metatable(x) or math_type(x) == 'integer'
    end
 
 
 
    function bint.isnumeric(x)
-      return getmetatable(x) == bint or type(x) == 'number'
+      return has_bint_metatable(x) or type(x) == 'number'
    end
 
 
@@ -835,7 +858,7 @@ local function newmodule(bits, wordbits)
 
 
    function bint.type(x)
-      if getmetatable(x) == bint then
+      if has_bint_metatable(x) then
          return 'bint'
       end
       return math_type(x)
@@ -1371,7 +1394,7 @@ local function newmodule(bits, wordbits)
 
       local ix
       local iy
-      ix, iy = tobint(ax), tobint(ay)
+      ix, iy = tobint(ax, false), tobint(ay, false)
       local quot
       local rema
       if ix and iy then
@@ -1794,7 +1817,7 @@ local function newmodule(bits, wordbits)
 
 
    function bint:__tostring()
-      return self:tobase(10)
+      return self:tobase(10, false)
    end
 
 
@@ -1813,3 +1836,209 @@ local function newmodule(bits, wordbits)
 end
 
 return newmodule
+end
+end
+
+do
+local _ENV = _ENV
+package.preload[ "verification.utils.tl-utils" ] = function( ... ) local arg = _G.arg;
+local _tl_compat; if (tonumber((_VERSION or ''):match('[%d.]*$')) or 0) < 5.3 then local p, m = pcall(require, 'compat53.module'); if p then _tl_compat = m end end; local ipairs = _tl_compat and _tl_compat.ipairs or ipairs; local pairs = _tl_compat and _tl_compat.pairs or pairs; local table = _tl_compat and _tl_compat.table or table
+
+
+
+
+
+local function find(predicate, arr)
+   for _, value in ipairs(arr) do
+      if predicate(value) then
+         return value
+      end
+   end
+   return nil
+end
+
+local function filter(predicate, arr)
+   local result = {}
+   for _, value in ipairs(arr) do
+      if predicate(value) then
+         table.insert(result, value)
+      end
+   end
+   return result
+end
+
+local function reduce(reducer, initialValue, arr)
+   local result = initialValue
+   for i, value in ipairs(arr) do
+      result = reducer(result, value, i, arr)
+   end
+   return result
+end
+
+
+local function map(mapper, arr)
+   local result = {}
+   for i, value in ipairs(arr) do
+      result[i] = mapper(value, i, arr)
+   end
+   return result
+end
+
+local function reverse(arr)
+   local result = {}
+   for i = #arr, 1, -1 do
+      table.insert(result, arr[i])
+   end
+   return result
+end
+
+local function compose(...)
+   local funcs = { ... }
+   return function(x)
+      for i = #funcs, 1, -1 do
+         x = funcs[i](x)
+      end
+      return x
+   end
+end
+
+local function keys(xs)
+   local ks = {}
+   for k, _ in pairs(xs) do
+      table.insert(ks, k)
+   end
+   return ks
+end
+
+local function values(xs)
+   local vs = {}
+   for _, v in pairs(xs) do
+      table.insert(vs, v)
+   end
+   return vs
+end
+
+local function includes(value, arr)
+   for _, v in ipairs(arr) do
+      if v == value then
+         return true
+      end
+   end
+   return false
+end
+
+return {
+   find = find,
+   filter = filter,
+   reduce = reduce,
+   map = map,
+   reverse = reverse,
+   compose = compose,
+   values = values,
+   keys = keys,
+   includes = includes,
+}
+end
+end
+
+local _tl_compat; if (tonumber((_VERSION or ''):match('[%d.]*$')) or 0) < 5.3 then local p, m = pcall(require, 'compat53.module'); if p then _tl_compat = m end end; local assert = _tl_compat and _tl_compat.assert or assert; local bint = require('verification.utils.bint')(2048, 32)
+local json = require('json')
+
+
+
+
+
+
+
+
+
+ValidateCheckpointData = {}
+
+
+
+
+
+
+ResponseData = {}
+
+
+
+
+
+
+Name = Name or "Verifier"
+Description = Description or "RandAO Verification Process"
+TotalSquarings = 1000000
+NumSegments = 10
+Exponent = 2
+SuccessMessage = "200: Success"
+
+
+function sendResponse(target, action, data)
+   return {
+      Target = target,
+      Action = action,
+      Data = json.encode(data),
+   }
+end
+
+
+local function infoHandler(msg)
+   ao.send({
+      Target = msg.From,
+      Name = Name,
+      Description = Description,
+   })
+end
+
+function computedCheckpointOutput(input, modulus, expectedOutput)
+   print("entered")
+   assert((TotalSquarings % NumSegments == 0), "Failure: Total Squarings and Number of Segments")
+   local segmentLength = TotalSquarings / NumSegments
+   print("Segment Length: " .. json.encode(segmentLength))
+
+   local bintInput = bint.fromstring(input)
+   print("Input: " .. json.encode(bint.tobase(bintInput, 10, true)))
+
+   local updatedResult = bintInput
+
+   local bintModulus = bint.fromstring(modulus)
+   print("Modulus: " .. json.encode(bint.tobase(bintModulus, 10, true)))
+
+   local bintExpectedOutput = bint.fromstring(expectedOutput)
+   print("Expected Output: " .. json.encode(bint.tobase(bintExpectedOutput, 10, true)))
+
+   for _ = 1, segmentLength do
+      updatedResult = bint.upowmod(bintInput, bint.frominteger(2), bintModulus)
+
+   end
+
+   if bint.eq(updatedResult, bintExpectedOutput) then
+      print("matched")
+      return true, ""
+   else
+      print("failed")
+      return false, "Failure: Expected =/= Computed Output"
+   end
+end
+
+local function validateCheckpointHandler(msg)
+   print("entered checkpoint")
+   local data = (json.decode(msg.Data))
+   local request_id = data.request_id
+   local checkpoint_input = data.checkpoint_input
+   local modulus = data.modulus
+   local expected_output = data.expected_output
+
+   local success, err = computedCheckpointOutput(checkpoint_input, modulus, expected_output)
+
+   if success then
+      ao.send(sendResponse(msg.From, "Valid ", SuccessMessage))
+   else
+      ao.send(sendResponse(msg.From, "Error", { message = "Failed to post VDF Input: " .. err }))
+   end
+end
+
+
+Handlers.add('info', Handlers.utils.hasMatchingTag('Action', 'Info'), infoHandler)
+Handlers.add('validateCheckpoint', Handlers.utils.hasMatchingTag('Action', 'Validate-Checkpoint'), validateCheckpointHandler)
